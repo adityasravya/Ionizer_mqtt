@@ -38,6 +38,7 @@ unsigned long uv_timeS = 0;            //take a varibale to store the millis tim
 int singleclick = 0;                    //take a variable to check weather it is on of off
 int doubleclick = 0;                    //take a variable to check weather the time is store in eeprom or not
 bool wifi_mqtt_enabled = 0;
+int device_status =0;
 OneButton button(PIN_INPUT, true);
 /*MQTT setting*/
 char mqtt_server[40] = "13.126.15.40";
@@ -97,9 +98,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.println();
 }
 
-
-
-
 unsigned long pressStartTime;          //take a variable to stor the millis value
 ICACHE_RAM_ATTR void checkTicks()      //attach the ram attribute
 {
@@ -136,6 +134,7 @@ void ion_on_off(void)
   digitalWrite(Red_LED, HIGH);                      //turn off the red led
   analogWrite(Fan, 300);
   singleclick = 1;
+  device_status = 1;                // device ON
   }
   else{
   Serial.println("ioniser turn off");
@@ -143,6 +142,7 @@ void ion_on_off(void)
   digitalWrite(Red_LED, HIGH);                      //turn off the red led
   analogWrite(Fan, LOW);                            //turn off the fan
   singleclick = 0;
+  device_status = 0;                              //device off
   }  
 }
 void doubleClick()
@@ -167,6 +167,7 @@ void uv_lamp_op(void)
   analogWrite(Fan, 1023);                                     // fan at high speed
   doubleclick = 1;  
   singleclick = 1;
+  device_status = 2;                                          // UV ON
 }
 
 void multiClick()
@@ -185,16 +186,12 @@ void multiClick()
   
 } // multiClick
 
-
-// this function will be called when the button was pressed 2 times in a short timeframe.
 void pressStart()
 {
   Serial.println("pressStart()");
   pressStartTime = millis() - 1000; // as set in setPressTicks()
 } // pressStart()
 
-
-// this function will be called when the button was pressed 2 times in a short timeframe.
 unsigned long diff_time;
 void pressStop()
 {
@@ -255,8 +252,7 @@ void wifi_manager_setup(void)
     ESP.reset();
     delay(1000);
   }
-  ticker.detach();
-  digitalWrite(BUILTIN_LED, HIGH);
+  
   wifi_mqtt_enabled =1;
   mqtt_connection();
 }
@@ -285,28 +281,12 @@ void clear_eeprom(void)
 void loop()
 {
   button.tick();
+  client.setCallback(callback);
   client.loop();
   threadControl.run();
   delay(10);
 }
 
-void setup_wifi() {
-  delay(100);
-  // We start by connecting to a WiFi network
-  Serial.print("Connecting to ");
- // Serial.println(ssid);
-  WiFi.begin("Aditya_wifi1", "sravyasravya");
-  while (WiFi.status() != WL_CONNECTED)
-  {
-    delay(500);
-    Serial.print(".");
-  }
-  randomSeed(micros());
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-}
 
 void mqtt_connection(void)
 {
@@ -315,9 +295,12 @@ void mqtt_connection(void)
   Serial.print("Connecting to MQTT ");
   if (client.connect("ESP8266Client")) {
     Serial.println("CONNECTED");
+    ticker.detach();
+    digitalWrite(BUILTIN_LED, HIGH);
     mqtt.subscribe("recieve",  topic1_subscriber);
+    client.subscribe("receive");
   } else {
-    Serial.println("failed, rc="+client.state());
+    Serial.println("FAILED");
   }
 
   // Enable Thread
@@ -327,9 +310,21 @@ void mqtt_connection(void)
 }
 
 void publisher() {
-  mqtt.publish("send", "Hello World!");
+  mqtt.publish("testout", "Hello Aerem100!");
+  update_status();
 }
 
 void topic1_subscriber(String topic, String message) {
   Serial.println("Message arrived in function 1 ["+topic+"] "+message);
+}
+
+void update_status(void)
+{
+  if(device_status == 0)
+  mqtt.publish("status", "OFF");
+  else if(device_status == 1)
+  mqtt.publish("status", "ON");
+  else if(device_status == 2)
+  mqtt.publish("status", "UV");
+  
 }
