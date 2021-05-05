@@ -12,8 +12,6 @@
 #include <ThreadController.h>
 #include <Ticker.h>
 
-#define WIFI_SSID "Aditya_wifi1"
-#define WIFI_PASS "sravyasravya"
 char* MQTT_SERVER = "65.0.109.93";
 
 WiFiClient espClient;
